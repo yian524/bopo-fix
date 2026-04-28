@@ -48,7 +48,7 @@ _CACHE_DIR = Path(os.environ.get("BPMF_DECODER_CACHE_DIR",
                                   Path.home() / ".cache" / "bpmf-decoder"))
 _CACHE_FILE = _CACHE_DIR / "reverse_dicts.pkl"
 _CEDICT_FILE = _CACHE_DIR / "cedict_ts.u8"  # downloaded once, see install
-_CACHE_VERSION = 6  # bump when build logic changes incompatibly
+_CACHE_VERSION = 7  # bump when build logic changes incompatibly
 
 
 _CEDICT_URL = "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.zip"
@@ -387,6 +387,91 @@ def _reverse_dicts() -> tuple[dict[str, str], dict[str, str], dict[str, int]]:
     for bp, txt in PREFERRED_CHAR.items():
         if len(txt) >= 2:
             phrase_dict[bp] = txt
+
+    # ── Taiwan tone variants ──────────────────────────────────────
+    # pypinyin uses mainland Mandarin (普通話) tones, not Taiwan
+    # Mandarin (國語). Some common chars have different tones:
+    #   期: 陸 ㄑㄧ vs 台 ㄑㄧˊ
+    #   質: 陸 ㄓˋ vs 台 ㄓˊ
+    #   識: 陸 ㄕˊ vs 台 ㄕˋ
+    #   企: 陸 ㄑㄧˋ vs 台 ㄑㄧˇ
+    #   危: 陸 ㄨㄟ vs 台 ㄨㄟˊ
+    #   攜: 陸 ㄒㄧˊ vs 台 ㄒㄧ
+    #   法: 陸 ㄈㄚˋ in proper nouns vs 台 ㄈㄚˇ universally
+    #
+    # Without these aliases, Taiwan users typing 「fu6」(ㄑㄧˊ) for 期
+    # would not find phrase_dict["ㄒㄧㄥㄑㄧˊ"] (pypinyin stored it as
+    # "ㄒㄧㄥㄑㄧ"), falling back to char-level → 其 instead of 期.
+    _TAIWAN_TONE_VARIANTS: dict[str, str] = {
+        # 期 (台 ㄑㄧˊ)
+        "ㄒㄧㄥㄑㄧˊ": "星期",
+        "ㄒㄧㄥㄑㄧˊㄧ": "星期一",
+        "ㄒㄧㄥㄑㄧˊㄦˋ": "星期二",
+        "ㄒㄧㄥㄑㄧˊㄙㄢ": "星期三",
+        "ㄒㄧㄥㄑㄧˊㄙˋ": "星期四",
+        "ㄒㄧㄥㄑㄧˊㄨˇ": "星期五",
+        "ㄒㄧㄥㄑㄧˊㄌㄧㄡˋ": "星期六",
+        "ㄒㄧㄥㄑㄧˊㄖˋ": "星期日",
+        "ㄒㄧㄥㄑㄧˊㄊㄧㄢ": "星期天",
+        "ㄑㄧˊㄐㄧㄢ": "期間",
+        "ㄑㄧˊㄉㄞˋ": "期待",
+        "ㄑㄧˊㄇㄛˋ": "期末",
+        "ㄑㄧˊㄔㄨ": "期初",
+        "ㄕˊㄑㄧˊ": "時期",
+        "ㄓㄡㄑㄧˊ": "週期",
+        "ㄔㄤˊㄑㄧˊ": "長期",
+        "ㄉㄨㄢˇㄑㄧˊ": "短期",
+        "ㄔㄨㄑㄧˊ": "初期",
+        "ㄇㄛˋㄑㄧˊ": "末期",
+        "ㄐㄧㄣˋㄑㄧˊ": "近期",
+        "ㄓㄨㄥㄑㄧˊ": "中期",
+        "ㄗㄠˇㄑㄧˊ": "早期",
+        "ㄨㄢˇㄑㄧˊ": "晚期",
+        "ㄉㄧㄥˋㄑㄧˊ": "定期",
+        "ㄩˋㄑㄧˊ": "預期",
+        "ㄒㄧㄢˋㄑㄧˊ": "限期",
+        "ㄍㄨㄛˋㄑㄧˊ": "過期",
+        "ㄐㄧㄚˋㄑㄧˊ": "假期",
+        "ㄒㄩㄝˊㄑㄧˊ": "學期",
+        "ㄈㄣㄑㄧˊ": "分期",
+        # 質 (台 ㄓˊ)
+        "ㄆㄧㄣˇㄓˊ": "品質",
+        "ㄨˋㄓˊ": "物質",
+        "ㄓˊㄌㄧㄤˋ": "質量",
+        "ㄒㄧㄥˋㄓˊ": "性質",
+        "ㄓˊㄧˊ": "質疑",
+        "ㄉㄢˋㄅㄞˊㄓˊ": "蛋白質",
+        "ㄉㄧˋㄓˊ": "地質",
+        "ㄊㄧˇㄓˊ": "體質",
+        # 識 (台 ㄕˋ)
+        "ㄓㄕˋ": "知識",
+        "ㄖㄣˋㄕˋ": "認識",
+        "ㄕˋㄅㄧㄝˊ": "識別",
+        "ㄧˋㄕˋ": "意識",
+        "ㄔㄤˊㄕˋ": "常識",
+        "ㄐㄧㄢˋㄕˋ": "見識",
+        "ㄒㄩㄝˊㄕˋ": "學識",
+        # 企 (台 ㄑㄧˇ)
+        "ㄑㄧˇㄧㄝˋ": "企業",
+        "ㄑㄧˇㄏㄨㄚˋ": "企劃",
+        "ㄑㄧˇㄐㄧˊ": "企及",
+        "ㄑㄧˇㄊㄨˊ": "企圖",
+        # 危 (台 ㄨㄟˊ)
+        "ㄨㄟˊㄒㄧㄢˇ": "危險",
+        "ㄨㄟˊㄐㄧ": "危機",
+        "ㄨㄟˊㄏㄞˋ": "危害",
+        "ㄨㄟˊㄐㄧˊ": "危急",
+        "ㄨㄟˊㄋㄢˋ": "危難",
+        # 攜 (台 ㄒㄧ)
+        "ㄒㄧㄉㄞˋ": "攜帶",
+        "ㄒㄧㄕㄡˇ": "攜手",
+        # 法 (台 ㄈㄚˇ universally)
+        "ㄈㄚˇㄍㄨㄛˊ": "法國",
+        "ㄈㄚˇㄩˇ": "法語",
+        "ㄈㄚˇㄨㄣˊ": "法文",
+    }
+    for bp, txt in _TAIWAN_TONE_VARIANTS.items():
+        phrase_dict[bp] = txt
 
     # User-supplied / corpus-mined phrases (from user_phrase_overrides.py).
     # Ships with example entries; users can hand-edit or regenerate from
