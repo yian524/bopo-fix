@@ -1,6 +1,6 @@
 """layouts.py — English keyboard key → Bopomofo symbol mapping.
 
-Source of truth for the 大千 (Standard / Dachen) layout: libchewing's Rust
+Source of truth for the Standard 注音 (BPMF) keyboard layout: libchewing's Rust
 source at `src/editor/zhuyin_layout/standard.rs` (LGPL-2.1, transcribed
 by hand from upstream). Verified against user's golden cases, e.g.:
 
@@ -8,18 +8,18 @@ by hand from upstream). Verified against user's golden cases, e.g.:
     cl3 → ㄏㄠˇ → 好
     vu04 → ㄒㄧㄢˋ → 線
 
-V1 ships only the 大千 layout (the Microsoft Bopomofo IME default in
+V1 ships only the standard layout (the Microsoft 注音 IME default in
 Taiwan). Adding 倚天 / Hsu / IBM later means adding a new dict below
 and switching by `LAYOUT` constant.
 """
 from __future__ import annotations
 
 # ────────────────────────────────────────────────────────────────────
-#                 大千 (Standard / Dachen) layout
+#                 Standard 注音 (BPMF) keyboard layout
 # ────────────────────────────────────────────────────────────────────
 # Bopomofo symbols (37) + tone marks (4 — 第一聲 is implicit / no mark).
 # Key string is what the user's keyboard literally types when the
-# Bopomofo IME is OFF and they type "as if" Bopomofo were on.
+# 注音 IME is OFF and they type "as if" Bopomofo were on.
 DACHEN: dict[str, str] = {
     # number row
     "1": "ㄅ", "2": "ㄉ", "3": "ˇ", "4": "ˋ", "5": "ㄓ",
@@ -48,7 +48,7 @@ TONE_MARKS: frozenset[str] = frozenset({"ˊ", "ˇ", "ˋ", "˙"})
 def english_to_bopomofo(text: str, layout: str = "dachen") -> str:
     """Translate raw English-key text to a Bopomofo + tone-marker stream.
 
-    Lower-cases ASCII letters (Bopomofo IME ignores Shift on letter keys —
+    Lower-cases ASCII letters (注音 IME ignores Shift on letter keys —
     Shift+letter is treated identically to letter).
 
     Characters not in the layout (e.g., spaces, CJK punctuation, or letters
@@ -80,7 +80,7 @@ def english_to_bopomofo(text: str, layout: str = "dachen") -> str:
     if table is None:
         raise ValueError(f"unknown layout: {layout!r}; choose from {sorted(LAYOUTS)}")
 
-    # Tone digits (3/4/6/7) END a syllable in Bopomofo IME — anything
+    # Tone digits (3/4/6/7) END a syllable in 注音 IME — anything
     # after them starts a new syllable OR is sentence-level punct.
     # The number-row keys 1/2/5/8/9/0/- are Bopomofo *letters* (B/D/Z/A/
     # AI/AN/ER), so a `,` after one of them IS mid-syllable.
