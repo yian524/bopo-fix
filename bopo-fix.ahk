@@ -18,9 +18,22 @@
 ;;   to deliver selection on Ctrl+C, short enough not to feel laggy
 ;;   when nothing is selected (we abort early in that case).
 
-; A_UserProfile is NOT a built-in in AHK v2 (v2 has A_AppData / A_Temp /
-; A_MyDocuments etc. but no UserProfile). Read it from the environment.
-CMD := EnvGet("USERPROFILE") . "\.claude\bin\bopo-fix.cmd"
+; Resolve bopo-fix.cmd relative to this .ahk file's location. This script
+; should sit in the same directory as bopo-fix.cmd (the repo root).
+;
+; If you place bopo-fix.cmd elsewhere (e.g., a PATH directory), set the
+; BOPO_FIX_CMD environment variable to its full path.
+CMD := EnvGet("BOPO_FIX_CMD")
+if (CMD == "") {
+    CMD := A_ScriptDir . "\bopo-fix.cmd"
+}
+if !FileExist(CMD) {
+    MsgBox "bopo-fix.cmd not found at: " . CMD
+        . "`n`nFix: place bopo-fix.cmd next to bopo-fix.ahk (same folder),"
+        . " OR set the BOPO_FIX_CMD environment variable to its full path.",
+        "bopo-fix install error", 0x10
+    ExitApp 1
+}
 
 #+z::  ; Win + Shift + Z
 {

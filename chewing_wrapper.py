@@ -51,8 +51,48 @@ _CEDICT_FILE = _CACHE_DIR / "cedict_ts.u8"  # downloaded once, see install
 _CACHE_VERSION = 6  # bump when build logic changes incompatibly
 
 
+_CEDICT_URL = "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.zip"
+
+
+def _download_cedict() -> bool:
+    """Download CC-CEDICT to ``_CEDICT_FILE`` on first use. Returns True on
+    success. Failure is non-fatal — the engine works without CC-CEDICT,
+    just with reduced phrase coverage (~88% vs ~92% accuracy).
+
+    Network errors / firewalls / offline machines: this just returns False
+    and the engine falls back to pypinyin-only phrase data.
+    """
+    import io
+    import urllib.request
+    import zipfile
+
+    try:
+        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
+        print(f"[bopo-fix] downloading CC-CEDICT from mdbg.net "
+              f"(~4MB, one-time) ...", flush=True)
+        with urllib.request.urlopen(_CEDICT_URL, timeout=30) as resp:
+            data = resp.read()
+        with zipfile.ZipFile(io.BytesIO(data)) as zf:
+            for name in zf.namelist():
+                if name.endswith(".u8") or name.endswith("_mdbg.txt"):
+                    with zf.open(name) as src, _CEDICT_FILE.open("wb") as dst:
+                        dst.write(src.read())
+                    print(f"[bopo-fix] saved CC-CEDICT to {_CEDICT_FILE}",
+                          flush=True)
+                    return True
+        return False
+    except Exception as e:
+        print(f"[bopo-fix] CC-CEDICT download failed ({type(e).__name__}: {e})"
+              f" — engine will run with reduced phrase coverage. Re-run later"
+              f" when network is available, or download manually from "
+              f"{_CEDICT_URL}", flush=True)
+        return False
+
+
 def _load_cedict_phrases() -> list[str]:
     """Read CC-CEDICT and return its Traditional phrase list (length ≥ 2).
+
+    Auto-downloads the dictionary on first invocation if missing.
 
     CC-CEDICT line format::
 
@@ -64,11 +104,12 @@ def _load_cedict_phrases() -> list[str]:
       - are no longer than 10 chars (filter idiom-storms / sentences
         that pollute the dict with extreme rarities)
 
-    Returns [] if the file isn't present (graceful — engine still works
-    on pypinyin-only data, just with thinner coverage).
+    Returns [] if the file isn't present and download fails (graceful —
+    engine still works on pypinyin-only data, just with thinner coverage).
     """
     if not _CEDICT_FILE.exists():
-        return []
+        if not _download_cedict():
+            return []
     phrases: list[str] = []
     with _CEDICT_FILE.open("r", encoding="utf-8") as f:
         for line in f:
