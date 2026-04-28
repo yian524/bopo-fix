@@ -48,88 +48,10 @@ _CACHE_DIR = Path(os.environ.get("BPMF_DECODER_CACHE_DIR",
                                   Path.home() / ".cache" / "bpmf-decoder"))
 _CACHE_FILE = _CACHE_DIR / "reverse_dicts.pkl"
 _CEDICT_FILE = _CACHE_DIR / "cedict_ts.u8"  # downloaded once, see install
-_MOEDICT_FILE = _CACHE_DIR / "moedict.json.xz"  # MOEDict 萌典, downloaded once
-_CACHE_VERSION = 8  # bump when build logic changes incompatibly
+_CACHE_VERSION = 7  # bump when build logic changes incompatibly
 
 
 _CEDICT_URL = "https://www.mdbg.net/chinese/export/cedict/cedict_1_0_ts_utf-8_mdbg.zip"
-_MOEDICT_URL = "https://raw.githubusercontent.com/g0v/moedict-data/master/dict-revised.json.xz"
-
-
-def _download_moedict() -> bool:
-    """Download MOEDict 萌典 (台灣教育部國語辭典) on first use.
-
-    MOEDict 是台灣 g0v 社群維護的開源國語辭典，含 16 萬詞 + 完整
-    台灣讀音 (注音)。比 pypinyin 的大陸讀音更精準，免去手補
-    台灣 tone variants。CC BY-ND 3.0 TW 授權。
-
-    Source: https://github.com/g0v/moedict-data
-    """
-    import urllib.request
-
-    try:
-        _CACHE_DIR.mkdir(parents=True, exist_ok=True)
-        print(f"[bpmf-decoder] downloading MOEDict 萌典 from g0v "
-              f"(~17MB, one-time) ...", flush=True)
-        with urllib.request.urlopen(_MOEDICT_URL, timeout=60) as resp:
-            data = resp.read()
-        _MOEDICT_FILE.write_bytes(data)
-        print(f"[bpmf-decoder] saved MOEDict to {_MOEDICT_FILE}", flush=True)
-        return True
-    except Exception as e:
-        print(f"[bpmf-decoder] MOEDict download failed "
-              f"({type(e).__name__}: {e}) — engine will fall back to "
-              f"CC-CEDICT + pypinyin (mainland tones, less accurate). "
-              f"Re-run later when network is available.", flush=True)
-        return False
-
-
-def _load_moedict_phrases_all() -> dict[str, list[str]]:
-    """Load MOEDict phrase data with ALL pronunciations (homophones kept).
-
-    Returns ``{bopomofo: [phrase, phrase, ...]}`` — multiple phrases may
-    share a bopomofo (e.g., 今天 and 金天 both ㄐㄧㄣㄊㄧㄢ). The caller
-    feeds these into the frequency-based phrase ranker which picks the
-    most common one per bopomofo.
-
-    Auto-downloads dictionary on first invocation.
-
-    Filters: phrase length 2-10 chars, all CJK Unified Ideographs (skips
-    PUA placeholders like ``{[8ff0]}`` and entries with non-CJK chars).
-    """
-    if not _MOEDICT_FILE.exists():
-        if not _download_moedict():
-            return {}
-
-    import json
-    import lzma
-
-    try:
-        with lzma.open(_MOEDICT_FILE, "rt", encoding="utf-8") as f:
-            entries = json.load(f)
-    except Exception as e:
-        print(f"[bpmf-decoder] MOEDict parse error: {e}", flush=True)
-        return {}
-
-    out: dict[str, list[str]] = defaultdict(list)
-    for entry in entries:
-        title = entry.get("title", "")
-        if not title or "{[" in title:
-            continue
-        if not (2 <= len(title) <= 10):
-            continue
-        if not all(0x4E00 <= ord(c) <= 0x9FFF for c in title):
-            continue
-        heteronyms = entry.get("heteronyms", [])
-        if not heteronyms:
-            continue
-        # Use primary (first) pronunciation only; rare 異讀 ignored.
-        bopo = (heteronyms[0].get("bopomofo") or "").strip()
-        if not bopo:
-            continue
-        bopo_normalized = bopo.replace(" ", "")
-        out[bopo_normalized].append(title)
-    return dict(out)
 
 
 def _download_cedict() -> bool:
@@ -413,18 +335,7 @@ def _reverse_dicts() -> tuple[dict[str, str], dict[str, str], dict[str, int]]:
     phrase_traditional: dict[str, str] = {}  # phrase → its traditional form
     phrase_bopomofo: dict[str, str] = {}     # phrase → its bopomofo
 
-    # ── MOEDict 萌典 lookup (deferred) ──
-    # We don't add MOEDict's 162k entries to the phrase candidate pool
-    # because MOEDict is a *dictionary* (含成語、典故、罕用詞), not a
-    # frequency list — adding all of them would dilute accuracy. Instead,
-    # we use MOEDict purely as a SOURCE OF TAIWAN BOPOMOFO ALIASES: for
-    # phrases already established as common (via pypinyin/CC-CEDICT),
-    # MOEDict tells us the correct Taiwan tone, and we add that as an
-    # extra key in phrase_dict pointing to the same phrase.
-    moedict_map = _load_moedict_phrases_all()
-
     # Source 1: pypinyin's phrases_dict (~47k lexical compounds)
-    # Lower priority than MOEDict (Mainland tones, less accurate for TW).
     for phrase in _phrases.keys():
         if len(phrase) < 2:
             continue
@@ -470,24 +381,6 @@ def _reverse_dicts() -> tuple[dict[str, str], dict[str, str], dict[str, int]]:
             ),
         )
         phrase_dict[bopo] = best
-
-    # ── MOEDict Taiwan-tone aliases ──
-    # For each phrase already chosen by frequency ranking, look up its
-    # MOEDict bopomofo. If MOEDict has a different reading (Taiwan tone
-    # vs Mainland tone), add the Taiwan reading as a phrase_dict alias.
-    # Example: phrase_dict["ㄒㄧㄥㄑㄧ"]=星期 (Mainland from pypinyin) →
-    # we add phrase_dict["ㄒㄧㄥㄑㄧˊ"]=星期 (Taiwan from MOEDict).
-    # This way users typing either tone get the same correct result.
-    moedict_phrase_to_bopo: dict[str, str] = {}
-    for bopo, traditional_list in moedict_map.items():
-        for traditional in traditional_list:
-            moedict_phrase_to_bopo.setdefault(traditional, bopo)
-    aliases_added = 0
-    for traditional in set(phrase_dict.values()):
-        moe_bopo = moedict_phrase_to_bopo.get(traditional)
-        if moe_bopo and moe_bopo not in phrase_dict:
-            phrase_dict[moe_bopo] = traditional
-            aliases_added += 1
 
     # Merge PREFERRED_CHAR multi-syllable entries — these always win
     # over the frequency-derived choice (manual override).
