@@ -44,8 +44,8 @@ _S2T = OpenCC("s2twp")
 # pickle is ~30ms. The cache key invalidates on changes to:
 #   - this file's source (overrides, freq logic)
 #   - pypinyin version (dictionary contents)
-_CACHE_DIR = Path(os.environ.get("BOPO_FIX_CACHE_DIR",
-                                  Path.home() / ".cache" / "bopo-fix"))
+_CACHE_DIR = Path(os.environ.get("BPMF_DECODER_CACHE_DIR",
+                                  Path.home() / ".cache" / "bpmf-decoder"))
 _CACHE_FILE = _CACHE_DIR / "reverse_dicts.pkl"
 _CEDICT_FILE = _CACHE_DIR / "cedict_ts.u8"  # downloaded once, see install
 _CACHE_VERSION = 6  # bump when build logic changes incompatibly
@@ -388,15 +388,15 @@ def _reverse_dicts() -> tuple[dict[str, str], dict[str, str], dict[str, int]]:
         if len(txt) >= 2:
             phrase_dict[bp] = txt
 
-    # User-supplied / corpus-mined phrases (from thesis_phrase_overrides.py).
+    # User-supplied / corpus-mined phrases (from user_phrase_overrides.py).
     # Ships with example entries; users can hand-edit or regenerate from
     # their own corpus via tests/build_phrase_overrides.py to capture
     # domain-specific vocabulary that generic frequency ranking misses.
     try:
-        from thesis_phrase_overrides import THESIS_PHRASES
+        from user_phrase_overrides import USER_PHRASES
     except ImportError:
-        THESIS_PHRASES = {}
-    for bp, txt in THESIS_PHRASES.items():
+        USER_PHRASES = {}
+    for bp, txt in USER_PHRASES.items():
         # Don't overwrite explicit PREFERRED_CHAR phrase entries
         if bp not in PREFERRED_CHAR:
             phrase_dict[bp] = txt
@@ -433,7 +433,7 @@ def _reverse_dicts() -> tuple[dict[str, str], dict[str, str], dict[str, int]]:
         if len(ch) == 1:
             char_dict[bp] = ch
 
-    # NOTE: THESIS_CORPUS_OVERRIDES is intentionally NOT applied to
+    # NOTE: USER_CHAR_OVERRIDES is intentionally NOT applied to
     # char_dict. Thesis corpus is heavily biased toward technical
     # compounds (式, 金, 據 etc.) which would replace common-usage
     # defaults like 是, 今, 具 — broken for general text. Phrase-level

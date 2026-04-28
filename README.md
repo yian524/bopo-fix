@@ -39,7 +39,7 @@ python -m venv .venv
 .venv\Scripts\pip install -r requirements.txt
 
 # 步驟 3：測試轉換功能（第一次跑會自動下載 4MB 中文詞庫）
-.venv\Scripts\python bopo_fix.py "rup wu0 wu0 fu4 5p cl3!"
+.venv\Scripts\python bpmf_decoder.py "rup wu0 wu0 fu4 5p cl3!"
 # 應該看到輸出：今天天氣真好！
 
 # 步驟 4：安裝 AutoHotkey v2（熱鍵需要它）
@@ -107,10 +107,10 @@ bpmf-decoder.cmd --input-file 亂碼.txt --output-file 還原.txt
 
 ### 方法 A：手動加進詞庫
 
-打開專案資料夾裡的 `thesis_phrase_overrides.py`，新增一行：
+打開專案資料夾裡的 `user_phrase_overrides.py`，新增一行：
 
 ```python
-THESIS_PHRASES = {
+USER_PHRASES = {
     ...
     "ㄒㄧㄣㄒㄩㄝˋㄍㄨㄢˇ": "心血管",   # 加上你要的詞
     "ㄐㄧˋㄒㄩˋ": "繼續",
@@ -124,7 +124,7 @@ THESIS_PHRASES = {
 
 存檔後刪掉快取讓新詞生效：
 ```powershell
-Remove-Item ~/.cache/bopo-fix/reverse_dicts.pkl
+Remove-Item ~/.cache/bpmf-decoder/reverse_dicts.pkl
 ```
 
 ### 方法 B：自動掃描你的文件學詞
@@ -139,7 +139,7 @@ Remove-Item ~/.cache/bopo-fix/reverse_dicts.pkl
 .venv\Scripts\python tests\build_char_overrides.py --corpus C:\Users\你的帳號\Documents\我的文件夾
 
 # 套用
-Remove-Item ~/.cache/bopo-fix/reverse_dicts.pkl
+Remove-Item ~/.cache/bpmf-decoder/reverse_dicts.pkl
 ```
 
 下次按熱鍵就會用你個人化的詞庫，準確度會更高。
@@ -193,10 +193,10 @@ Remove-Item ~/.cache/bopo-fix/reverse_dicts.pkl
 
 ```powershell
 # 跑單元測試（150 個）
-.venv\Scripts\python -m pytest tests\ --ignore=tests\fuzz_thesis.py -v
+.venv\Scripts\python -m pytest tests\ --ignore=tests\fuzz.py -v
 
 # 對任意文字資料夾跑隨機測試
-.venv\Scripts\python tests\fuzz_thesis.py --root C:\path\to\your-text-folder --samples 100
+.venv\Scripts\python tests\fuzz.py --root C:\path\to\your-text-folder --samples 100
 ```
 
 ## 用了哪些開源工具

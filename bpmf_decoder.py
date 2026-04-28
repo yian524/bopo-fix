@@ -1,13 +1,13 @@
-"""bopo_fix.py — entry point for the wrong-IME-layout undo tool.
+"""bpmf_decoder.py — entry point for the wrong-IME-layout undo tool.
 
 Reads the garbled English-key text on stdin, prints the recovered
 Traditional Chinese on stdout. Designed to be invoked by the
-``bopo-fix.cmd`` shim which is itself called by AutoHotkey on hotkey
+``bpmf-decoder.cmd`` shim which is itself called by AutoHotkey on hotkey
 press.
 
 CLI:
 
-    echo rup wu0 wu0 fu4 5p cl3! | bopo-fix
+    echo rup wu0 wu0 fu4 5p cl3! | bpmf-decoder
     → 今天天氣真好！
 
 Options:
@@ -114,7 +114,7 @@ def convert(garbled: str, layout: str = "dachen", apply_punct: bool = True) -> s
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(
-        prog="bopo-fix",
+        prog="bpmf-decoder",
         description="Recover Traditional Chinese from English-keys typed with the wrong IME state.",
     )
     p.add_argument(

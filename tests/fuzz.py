@@ -2,7 +2,7 @@
 
 Round-trip pipeline:
    Chinese → pypinyin Bopomofo → reverse-layout English keys
-           → bopo-fix CLI → 還原中文
+           → bpmf-decoder CLI → 還原中文
    compare(original, recovered)
 
 Sources random Chinese snippets from a directory of .md/.txt files.
@@ -11,8 +11,8 @@ mistranslated so you can target them in PREFERRED_CHAR or expand
 CC-CEDICT phrase coverage.
 
 Usage:
-    python tests/fuzz_thesis.py --root ~/my-text-folder --samples 100
-    python tests/fuzz_thesis.py --root /path/to/corpus --min 20 --max 150
+    python tests/fuzz.py --root ~/my-text-folder --samples 100
+    python tests/fuzz.py --root /path/to/corpus --min 20 --max 150
 """
 from __future__ import annotations
 
@@ -30,7 +30,7 @@ if str(_HERE) not in sys.path:
 
 from pypinyin import Style, pinyin
 
-from bopo_fix import convert
+from bpmf_decoder import convert
 from layouts import DACHEN
 
 # Reverse-direction layout: Bopomofo symbol → English key.
@@ -56,7 +56,7 @@ _CJK_RE = re.compile(r"[一-鿿]")
 _CJK_CHUNK_RE = re.compile(r"[一-鿿]+")
 
 
-def collect_thesis_snippets(root: Path, min_len: int, max_len: int,
+def collect_snippets(root: Path, min_len: int, max_len: int,
                              samples: int) -> list[str]:
     """Walk the thesis directory, find files with substantial Chinese
     content, randomly extract `samples` snippets of length min..max chars
@@ -110,7 +110,7 @@ def collect_thesis_snippets(root: Path, min_len: int, max_len: int,
 
 
 def round_trip(original: str) -> tuple[str, str]:
-    """Forward Chinese → Bopomofo → keys, then bopo-fix back to Chinese.
+    """Forward Chinese → Bopomofo → keys, then bpmf-decoder back to Chinese.
     Returns (english_keys, recovered_chinese)."""
     # Forward: Chinese → Bopomofo (one syllable per char).
     bopo_per_char = pinyin(original, style=Style.BOPOMOFO, errors="ignore")
@@ -118,7 +118,7 @@ def round_trip(original: str) -> tuple[str, str]:
     bopo_str = " ".join(p[0] for p in bopo_per_char if p)
     # Reverse layout: Bopomofo → English keys.
     keys = bopomofo_to_keys(bopo_str)
-    # Now run through bopo-fix (the actual production code path).
+    # Now run through bpmf-decoder (the actual production code path).
     recovered = convert(keys)
     return keys, recovered
 
@@ -155,7 +155,7 @@ def main() -> int:
 
     print(f"📚 sampling from {root} (size {args.min}-{args.max} chars × "
           f"{args.samples} cases)…")
-    snippets = collect_thesis_snippets(root, args.min, args.max, args.samples)
+    snippets = collect_snippets(root, args.min, args.max, args.samples)
     if not snippets:
         print("❌ no snippets found")
         return 2

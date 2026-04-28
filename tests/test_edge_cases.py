@@ -17,7 +17,7 @@ if str(_HERE) not in sys.path:
 
 import pytest
 
-from bopo_fix import _collapse_inter_cjk_spaces, _is_cjk, convert, main
+from bpmf_decoder import _collapse_inter_cjk_spaces, _is_cjk, convert, main
 
 
 # ============================================================

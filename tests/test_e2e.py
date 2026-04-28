@@ -18,7 +18,7 @@ if str(_HERE) not in sys.path:
 
 import pytest
 
-from bopo_fix import convert
+from bpmf_decoder import convert
 
 
 # ============================================================
@@ -77,22 +77,22 @@ class TestCliInvocation:
     """Verify the CLI binary is callable end-to-end as the AHK script will.
 
     Skipped if the venv python isn't where we expect — the test is
-    machine-specific to the user's bopo-fix install layout.
+    machine-specific to the user's bpmf-decoder install layout.
     """
 
     @pytest.fixture
     def cli_python(self):
-        py = Path.home() / ".claude" / "scripts" / "bopo-fix" / ".venv" / "Scripts" / "python.exe"
+        py = Path.home() / ".claude" / "scripts" / "bpmf-decoder" / ".venv" / "Scripts" / "python.exe"
         if not py.exists():
             pytest.skip(f"venv python not found at {py}")
         return str(py)
 
     @pytest.fixture
     def cli_script(self):
-        return str(Path.home() / ".claude" / "scripts" / "bopo-fix" / "bopo_fix.py")
+        return str(Path.home() / ".claude" / "scripts" / "bpmf-decoder" / "bpmf_decoder.py")
 
     def test_stdin_pipeline(self, cli_python, cli_script):
-        """Pipe input → bopo_fix.py → stdout, decode UTF-8."""
+        """Pipe input → bpmf_decoder.py → stdout, decode UTF-8."""
         proc = subprocess.run(
             [cli_python, cli_script],
             input="rup wu0 wu0 fu4 5p cl3!".encode("utf-8"),
