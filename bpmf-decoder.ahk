@@ -40,12 +40,34 @@ if !FileExist(CMD) {
     static TmpIn := A_Temp . "\bpmf-decoder-in.txt"
     static TmpOut := A_Temp . "\bpmf-decoder-out.txt"
 
+    ; Detect terminal-class windows so we don't accidentally fire
+    ; SIGINT into them. In CLI (Windows Terminal / cmd / PowerShell /
+    ; mintty / ConEmu / Alacritty / WezTerm / VS Code integrated term)
+    ; plain Ctrl+C with NO selection = SIGINT, killing the running
+    ; program (Claude, pip install, whatever). The terminals' "real
+    ; copy" shortcut is Ctrl+Shift+C, which is a no-op when nothing
+    ; is selected (safe) and copies when something is. Same logic
+    ; for paste: Ctrl+Shift+V vs Ctrl+V.
+    ;
+    ; WinGetClass throws TargetError when there's no foreground
+    ; window (e.g., screen locked, desktop active). Wrap defensively
+    ; so the hotkey degrades to the GUI path instead of crashing.
+    fgClass := ""
+    try fgClass := WinGetClass("A")
+    isTerminal := (fgClass != "") && (fgClass ~= "i)(ConsoleWindowClass|CASCADIA|VirtualConsole|mintty|alacritty|wezterm)")
+    copyKey := isTerminal ? "^+c" : "^c"
+    pasteKey := isTerminal ? "^+v" : "^v"
+
     ; Save current clipboard (binary blob — preserves images / files / formats).
     saved := ClipboardAll()
     A_Clipboard := ""
-    Send "^c"
+    Send copyKey
     if !ClipWait(0.3) {
-        TrayTip "bpmf-decoder", "請先選取要還原的英文亂碼", 0x10
+        if isTerminal {
+            TrayTip "bpmf-decoder", "終端機未偵測到選取範圍，請先反白亂碼再試一次", 0x10
+        } else {
+            TrayTip "bpmf-decoder", "請先選取要還原的英文亂碼", 0x10
+        }
         A_Clipboard := saved
         return
     }
@@ -96,7 +118,7 @@ if !FileExist(CMD) {
         A_Clipboard := saved
         return
     }
-    Send "^v"
+    Send pasteKey
 
     ; Restore the user's original clipboard after the paste settles.
     Sleep 150
